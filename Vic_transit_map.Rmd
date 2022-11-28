@@ -1,0 +1,228 @@
+
+
+```{r}
+library(shiny)
+library(shinydashboard)
+library(leaflet)
+library(dplyr)
+library(curl)
+library(sf)
+library(bcmaps)
+
+```
+
+
+
+```{r}
+municipalities <- municipalities()
+municipalities <- (municipalities[(municipalities$ADMIN_AREA_ABBREVIATION == "Victoria"|municipalities$ADMIN_AREA_ABBREVIATION == "Oak Bay" | municipalities$ADMIN_AREA_ABBREVIATION == "Duncan"  |municipalities$ADMIN_AREA_ABBREVIATION ==  "Central Saanich" |  municipalities$ADMIN_AREA_ABBREVIATION =="View Royal" | municipalities$ADMIN_AREA_ABBREVIATION == "North Saanich"| municipalities$ADMIN_AREA_ABBREVIATION == "Colwood"| municipalities$ADMIN_AREA_ABBREVIATION == "Esquimalt" |  municipalities$ADMIN_AREA_ABBREVIATION == "Saanich"|  municipalities$ADMIN_AREA_ABBREVIATION == "Langford"),])
+municipalities <- st_transform(municipalities, "+proj=longlat +datum=WGS84")
+
+
+
+subdivisions <- census_subdivision()
+subdivisions <- (subdivisions[(subdivisions$CENSUS_SUBDIVISION_NAME == "Victoria"),])
+subdivisions <- st_transform(subdivisions, "+proj=longlat +datum=WGS84")
+
+
+district <- regional_districts()
+district <- district[(district$ADMIN_AREA_ABBREVIATION == "CAPRD"),]
+district <- st_transform(district, "+proj=longlat +datum=WGS84")
+```
+```{r}
+shapes <- read_sf('routes.shp')
+city <- read.csv("file.csv")
+```
+
+```{r}
+header <- dashboardHeader(
+  title = "Victoria Transit Map"
+)
+
+body <- dashboardBody(
+  
+   fluidRow(
+   
+    column(width = 9,
+      box(width = NULL, solidHeader = TRUE,
+        leafletOutput("map", height = 500)
+      ),
+      
+    ),
+    column(width = 3,
+      box(width = NULL, status = "warning",
+        uiOutput("select_route"),
+       
+      ),
+      box(width = NULL, status = "warning",
+        uiOutput("information"),
+       
+      ),
+      
+    )
+   )
+  ) 
+
+
+ 
+ui <-  dashboardPage(
+  header,
+  dashboardSidebar(disable = TRUE),
+  body
+)
+
+route_shape_fun<-function(route_no){
+
+  shapes[(shapes$Route == route_no),]
+  
+}
+
+
+time <-function(route_no){
+
+  
+  
+  city <- city[(city$route_short_name == route_no),]
+  total <- nrow(city)-1
+  vic <- 0
+
+  for(i in 1:total){
+   if(city$muni[i] == "Victoria"){
+    
+     vic <- vic+1
+     
+   }else{
+     vic <- vic
+   }
+   
+  }
+ 
+  percentage = round(((vic/total)*100),0)
+  
+ print(paste("Bus Number",route_no, "spends", percentage, "percent of trip time in Victoria, B.C."))
+ 
+}
+
+
+
+server <- function(input, output, session){
+
+   output$select_route <- renderUI({
+    route_no <- sort(unique(as.numeric(shapes$Route)))
+    
+    names(route_no) <- route_no
+    
+    route_no <- c(All = 0, route_no)
+    selectInput("route_no", "Route", choices = route_no, selected = route_no[2])
+  })
+   
+   output$information <- renderUI({
+     if(as.numeric(input$route_no != 0)){
+       return(time(input$route_no))
+     } else{
+       print("Please choose specific route no")
+     }
+    
+     
+     
+   })
+   
+   
+   output$map <-renderLeaflet({
+     
+    
+      map <- leaflet() %>%
+       addTiles() %>%
+        setView(lng = -123.3656, lat = 48.4284, zoom = 12)
+       
+       
+        map <- addPolylines(map, data = subdivisions, fill = TRUE, fillColor = "Grey", color = "Blue")
+        map <- addPolylines(map, data = municipalities, fill = FALSE, color = "Green", label = municipalities$ADMIN_AREA_ABBREVIATION)
+        
+        
+       
+        if(as.numeric(input$route_no != 0)){
+         
+          route_shape <- route_shape_fun(input$route_no)
+        
+        
+          coords <- st_coordinates(route_shape)
+        n <-  nrow(coords)
+        longstart = coords[1,1]
+        latstart = coords[1,2]
+      
+        longend = coords[n,1]
+        latend = coords[n,2]
+       content <-time(input$route_no)
+
+        
+        map <- addPolylines(map, data = route_shape, color = "Red", label = input$route_no )
+        map <- addPolylines(map, data = subdivisions, fill = TRUE, fillColor = "grey")
+        map <- addMarkers(map, lat = latstart, lng = longstart , label = "Route_Begin" )
+        map <- addMarkers(map, lat = latend, lng = longend, label = "Route_End")
+         map <- addLabelOnlyMarkers(map, lng = -123.3656, lat = 48.4284, label = content, labelOptions = labelOptions(noHide = T))
+       
+         }else{
+        
+         map <- addPolylines(map,data = shapes)
+       }
+        
+        
+         
+  })
+
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+ 
+}
+
+
+shiny::shinyApp(ui = ui, server = server) 
+
+```
+
+
+#Raw code for get stop municiplities
+bc_stops_shape <- read_sf("bus_stops.shp")
+write.csv(bc_stops_shape, "bc_stops_shape.csv")
+
+
+
+mun_shape <- read.csv("mun_shapes.csv")
+nrow(mun_shape)
+stops <- read.delim2("stops.txt", sep = ",", header = T)
+stops = stops[, c("stop_id", "stop_code")]
+head(stops)
+stop_times <- read.delim2("stop_times.txt", sep = ",", header = T)
+head(stop_times)
+stop_times <- stop_times[, c("stop_id", "trip_id")]
+trips <- read.delim2("trips.txt", sep = ",", header = T)
+trips <- trips[, c("trip_id", "route_id")]
+routes <- read.delim2("routes.txt", sep = ",", header = T)
+routes <- routes[, c("route_id", "route_short_name")]
+  
+
+
+file <- merge(mun_shape, stops, by.x = "stopid", by.y = "stop_code", all.x = TRUE)
+file <- merge(file, stop_times, by.x = "stop_id", by.y = "stop_id", all.x = TRUE)
+
+file <- merge(file,trips, by.x = "trip_id", by.y = "trip_id", all.x = TRUE )
+file <- merge(file, routes, by.x = "route_id", by.y = "route_id", all.x = TRUE)
+file <- distinct(file, stop_id, .keep_all = TRUE)
+write.csv(file, "file.csv")
+head(file)
+nrow(file)
+
+
+
+
+
