@@ -1,2 +1,6 @@
-# sample-r-shiny-geo-app
-A sample R+Shiny application using the bcmaps package and BC Transit routes for Victoria
+# Sample R+Shiny Dashboard App Using bcmaps Package and BC Transit Routes for Victoria
+This app is a geospatial demo using the [bcmaps](https://github.com/bcgov/bcmaps) package available in R, produced by the BC Government. The demo app draws a map and then places [Census Subdivision](https://www150.statcan.gc.ca/n1/pub/92-195-x/2011001/geo/csd-sdr/def-eng.htm) boundaries on the map for the Victoria, B.C. metropolitan area. The app also draws routes from a shapefile produced by BC Transit, that describes the bus routes in the city including the paths they take. The app provides an example of computing how much of its total route a bus spends in a census subdivion. This app can be developed further and be useful analyses such as economic factors and understanding of under/overserved neighborhoods by transit operators in relation to things like household income, family composition, etc.
+
+## Running the app
+The easiest way to run the app is to put all files in this repo in the same folder and open the .rmd file using R Studio. Running all blocks will execute the code and produce a Shiny app. Once the app has been developed further as needed, the easiest way to publish it would be to the [ShinyApps.io](https://www.shinyapps.io/) website. Cloud options are also an easy way to deploy, using services such as AWS or Heroku.
+
